@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html lang="ch-ZN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>哈夫曼编码的应用</title>
+    <link rel="stylesheet" href="./node_modules/bootstrap/dist/css/bootstrap.min.css">
+    <script src="./node_modules/jquery/dist/jquery.min.js"></script>
+    <script src="./layer/layer.js"></script>
+    <script src="./js/haffman.js"></script>
+    <style>
+        .footer span{
+            color:#9f9f9f
+        }
+    </style>
+</head>
+<body>
+    <nav class="navbar navbar-light bg-light">
+        <a class="navbar-brand" href="#">
+            <img src="./images/HS编码.png" width="30" height="30" class="d-inline-block align-top" alt="" loading="lazy">
+            哈夫曼编码的应用
+        </a>
+    </nav>
+    <div class="container mt-2">
+        <div class="input-group mb-3">
+            <div class="input-group-prepend">
+              <span class="input-group-text" id="basic-addon1">需要加密的字符串:</span>
+            </div>
+            <input type="text" class="form-control" placeholder="字符串" id="code_before">
+        </div>
+        <div class="input-group mb-3">
+            <div class="input-group-prepend">
+              <span class="input-group-text" id="basic-addon1">加密之后的字符串:</span>
+            </div>
+            <input type="text" class="form-control" placeholder="加密后的结果" id="code_after" readonly>
+            <div class="input-group-append">
+                <button class="btn btn-success" type="button" id="check" disabled>检 验</button>
+            </div>
+        </div>
+        <button type="button" class="btn btn-primary btn-lg btn-block" id="encode">编&nbsp;&nbsp;&nbsp;&nbsp;码</button>
+    </div>
+    <footer class="footer mt-4">
+        <span class="d-flex justify-content-center">©数据结构五排开黑小组版权所有</span>
+    </footer>
+    <script type="text/javascript">
+        /*
+        已知通讯中要传输的一段电文是{CAS;CAT;SAT;AT}，
+        要传输的字符集是D={C，A，S，T， ；}，
+        请根据要传输字符出现的频率，为这段电文设计一套二进制编码，使其传输的电文长度达到最短。
+        */
+        var charCode = {};
+        var root = null;
+        $(function(){
+            $("#encode").click(function(){
+                //编码按钮被单击
+                let code_before = $("#code_before").val();//获取字符串
+                if(code_before == ""){
+                    layer.msg("请先输入要编码的字符串！",{icon:0})
+                }else{
+                    encode(code_before);
+                    console.log(charCode);
+                    for(key in charCode){
+                        let reg = new RegExp(key,"g");
+                        code_before = code_before.replace(reg,charCode[key]);
+                    }
+                    $("#code_after").val(code_before);
+                    console.log();
+                    $("#check").removeAttr("disabled");
+                }
+            });
+            $("#check").click(function(){
+                //检验按钮被单击
+                let code_before = $("#code_before").val();//获取字符串
+                let check_code = $("#code_after").val();
+                let res = decode(check_code,root);
+                if(res == code_before){
+                    layer.msg("检验结果为:<font color='red'>"+res+"</font>,与原字符串一致!",{icon:1});
+                }else{
+                    layer.msg("检验结果为:"+res+"<br>与原字符串不一致!",{icon:2})
+                }
+                
+            });
+            $("#code_before").bind("input propertychange",function(){
+                $("#check").attr("disabled","disabled");
+                $("#code_after").val("");
+            })
+        })
+        function decode(string,root){
+            /*
+            解码
+            @param string:已编码的字符串
+            @param root:构造的哈夫曼树
+            @return res:解码的字符串
+            */
+            let p = root;
+            let res = "";
+            for(let i=0;i<string.length+1;i++){
+                if((p.lchild != null) && (p.rchild != null)){
+                    p = (string[i] == "0")?(p.lchild):(p.rchild);//编码为0为左子树，1为右子树
+                }else{
+                    //叶结点为编码的字符
+                    res += p.char;//解码的结果
+                    p = root;//从根结点重新开始
+                    i = i-1;
+                }
+            }
+            return res;
+        }
+        function encode(string){
+            //编码 
+            charCode = {};
+            countOfChar = process(string);//得到每个字符出现的次数
+            let arr = [];
+            for(let i in countOfChar){
+                arr.push(new Haffman(i,countOfChar[i]));
+            }
+            while(arr.length > 1){
+                let candidate = findSmallest(arr);//找到当前权重最小的两个结点的索引
+                arr[candidate[0]].code = 0;//左子树编码为0
+                arr[candidate[1]].code = 1;//右子树编码为1
+                node_weight = arr[candidate[0]].weight + arr[candidate[1]].weight;//得到新结点的权重
+                let node = new Haffman(node_weight.toString(),node_weight,arr[candidate[0]],arr[candidate[1]]);
+                arr.splice(candidate[0],1);//删除这两个最小权重的结点
+                if(candidate[0] > candidate[1]){
+                    //如果第一个删除的结点索引在第二个删除节点索引之后
+                    arr.splice(candidate[1],1);
+                }else{
+                    //如果第一个删除节点的索引在第二个结点索引之前
+                    arr.splice((candidate[1]-1),1);
+                }
+                arr.push(node);//将新生成的结点加入数组
+            }
+            root = arr[0];//根结点
+            root.code = "";
+            getCharCode(root,root.code);//得到每个字符的编码，存入全局变量charCode
+        }
+        function getCharCode(node,lastCode){
+            if((node.lchild == null) && (node.rchild == null)){
+                charCode[node.char] = lastCode + node.code.toString();
+            }else{
+                let code = lastCode + node.code.toString();
+                getCharCode(node.lchild,code);
+                getCharCode(node.rchild,code);
+            }
+        }
+        function findSmallest(arr){
+            /*找到当前最小权重的两个结点
+            @param arr:哈夫曼树结点数组
+            @return index:返回当前最小权重的两个结点的数组索引
+            */
+            let index = [0];//按权重从小到大排序
+            for(let i=1;i<arr.length;i++){
+                if(index.length < 2){
+                    index.push(i);
+                    //进行排序，将权重小的放在第一个
+                    if(arr[i].weight < arr[index[0]].weight){
+                        let tmp = arr[i];
+                        arr[i] = arr[index[0]];
+                        arr[index[0]] = tmp;
+                    }
+                }else{
+                    if(arr[i].weight <= arr[index[1]].weight){
+                        if(arr[i].weight < arr[index[0].weight]){
+                            index[0] = i;
+                        }else{
+                            index[1] = i;
+                        }
+                    }
+                }
+            }
+            return index;
+        }
+        function process(str){
+            //字符串处理
+            res = {};//存储每个字符出现的次数
+            for(let i=0;i<str.length;i++){
+                //统计每个字符出现的个数
+                let word = str[i];
+                if(res[word]){
+                    res[word]++;
+                }else{
+                    res[word] = 1;
+                }
+            }
+            return res;
+        }
+    </script>
+</body>
+</html>
